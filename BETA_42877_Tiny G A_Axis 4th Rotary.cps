@@ -39,7 +39,7 @@ minimumCircularRadius = spatial(0.01, MM);
 maximumCircularRadius = spatial(1000, MM);
 minimumCircularSweep = toRad(0.01);
 maximumCircularSweep = toRad(120);
-allowHelicalMoves = false;
+allowHelicalMoves = tr;
 allowedCircularPlanes = 1 << PLANE_XY;
 
 // user-defined properties
@@ -56,7 +56,7 @@ properties = {
   useActiveSpindle: true, // enable to use spindle S, M3, M4, ...
   useRadius: false, // specifies that arcs should be output using the radius (R word) instead of the I, J, and K words
   useG28: "clearanceHeight" // specifies the desired safe retracts
-    usePostProcessorSpindleSpeedOverride: true, // Enables Min Max Spindle Overwriting by Fusion 360 Post Processor
+  usePostProcessorSpindleSpeedOverride: true, // Enables Min Max Spindle Overwriting by Fusion 360 Post Processor
   EnableAAxis:true, // Enable A Axis
 };
 
@@ -72,6 +72,7 @@ propertyDefinitions = {
   optionalStop: {title:"Optional stop", description:"Outputs optional stop code during when necessary in the code.", type:"boolean"},
   separateWordsWithSpace: {title:"Separate words with space", description:"Adds spaces between words if 'yes' is selected.", type:"boolean"},
   useActiveSpindle: {title:"Use active spindle", description:"Enable to use spindle commands (S, M3, M4, ...).", type:"boolean"},
+  usePostProcessorSpindleSpeedOverride: {title: "Use Post Processor Spindle Speed Overide", type:"boolean"},
   useRadius: {title:"Radius arcs", description:"If yes is selected, arcs are outputted using radius values rather than IJK.", type:"boolean"},
   useG28: {
     title: "Safe Retracts",
@@ -82,6 +83,7 @@ propertyDefinitions = {
       {title:"G53", id:"false"},
       {title:"Clearance Height", id:"clearanceHeight"}
     ]
+
   }
 };
 
@@ -181,7 +183,9 @@ function onOpen() {
         setMachineConfiguration(machineConfiguration);
         optimizeMachineAngles2(1); // map tip mode
   }
-
+    }
+  }
+}
   if (!machineConfiguration.isMachineCoordinate(0)) {
     aOutput.disable();
   }
@@ -322,7 +326,6 @@ function onOpen() {
     writeBlock(gUnitModal.format(21));
     break;
   }
-}
 
 function onComment(message) {
   var comments = String(message).split(";");
@@ -488,13 +491,13 @@ function onSection() {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
 
-    if (tool.number > 99) {
+    if (tool.number > 33) {
       warning(localize("Tool number exceeds maximum value."));
     }
 
     if (properties.useM6) {
-      writeBlock("T" + toolFormat.format(tool.number), mFormat.format(6));
-    } else {
+      writeBlock("T" + toolFormat.format(tool.number), mFormat.format(6))
+      writeBlock(gFormat.format(43) + " " + "H" + toolFormat.format(tool.number));    } else {
       writeBlock("T" + toolFormat.format(tool.number));
     }
     if (tool.comment) {
@@ -538,23 +541,26 @@ function onSection() {
   
   if (insertToolCall ||
       isFirstSection() ||
-      (rpmFormat.areDifferent(spindleSpeed, sOutput.getCurrent())) ||
+      (rpmFormat.areDifferent(tool.spindleRPM, sOutput.getCurrent())) ||
       (tool.clockwise != getPreviousSection().getTool().clockwise)) {
-    if (spindleSpeed < 1) {
-      error(localize("Spindle speed out of range."));
+      if (properties.usePostProcessorSpindleSpeedOverride)
+          if (tool.spindleRPM < 3500) {
+      writeBlock(mFormat.format(3),sOutput.format(3500));
       return;
     }
-    if (spindleSpeed > 99999) {
-      warning(localize("Spindle speed exceeds maximum value."));
+    if (properties.usePostProcessorSpindleSpeedOverride) 
+        if  (tool.spindleRPM > 22000) {  
+      writeBlock(mFormat.format(3),sOutput.format(22000));
+      return
     }
     if (properties.useActiveSpindle) {
       writeBlock(
-        mFormat.format(tool.clockwise ? 3 : 4), sOutput.format(spindleSpeed)
+        mFormat.format(tool.clockwise ? 3 : 4), sOutput.format(tool.spindleRPM)
       );
     } else {
-      sOutput.format(spindleSpeed);
+      sOutput.format(tool.spindleRPM);
       writeComment(
-        mFormat.format(tool.clockwise ? 3 : 4) + " " + "S" + rpmFormat.format(spindleSpeed)
+        mFormat.format(tool.clockwise ? 3 : 4) + " " + "S" + rpmFormat.format(tool.spindleRPM)
       );
       wait = true;
     }
