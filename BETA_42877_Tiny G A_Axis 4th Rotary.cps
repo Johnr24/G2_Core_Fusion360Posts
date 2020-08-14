@@ -34,19 +34,18 @@ setCodePage("ascii");
 capabilities = CAPABILITY_MILLING;
 tolerance = spatial(0.002, MM);
 
-minimumChordLength = spatial(0.25, MM);
+minimumChordLength = spatial(0.01, MM);
 minimumCircularRadius = spatial(0.01, MM);
 maximumCircularRadius = spatial(1000, MM);
 minimumCircularSweep = toRad(0.01);
-maximumCircularSweep = toRad(120);
-allowHelicalMoves = tr;
-allowedCircularPlanes = 1 << PLANE_XY;
-
+maximumCircularSweep = toRad(180);
+allowHelicalMoves = true;
+allowedCircularPlanes = undefined; // allow any circular motion
 // user-defined properties
 properties = {
   writeMachine: true, // write machine
   writeTools: true, // writes the tools
-  useM6: false, // disable to avoid M6 output - preload is also disabled when M6 is disabled
+  useM6: true, // disable to avoid M6 output - preload is also disabled when M6 is disabled
   preloadTool: false, // preloads next tool on tool change if any
   showSequenceNumbers: false, // show sequence numbers
   sequenceNumberStart: 10, // first sequence number
@@ -55,9 +54,10 @@ properties = {
   separateWordsWithSpace: true, // specifies that the words should be separated with a white space
   useActiveSpindle: true, // enable to use spindle S, M3, M4, ...
   useRadius: false, // specifies that arcs should be output using the radius (R word) instead of the I, J, and K words
-  useG28: "clearanceHeight" // specifies the desired safe retracts
-  usePostProcessorSpindleSpeedOverride: true, // Enables Min Max Spindle Overwriting by Fusion 360 Post Processor
   EnableAAxis:true, // Enable A Axis
+  usePostProcessorSpindleSpeedOverride: true, // Enable Post Processor Safety 
+  useG28: "clearanceHeight" // specifies the desired safe retracts
+
 };
 
 // user-defined property definitions
@@ -263,32 +263,6 @@ function onOpen() {
     }
   }
   
-  if (false) {
-    // check for duplicate tool number
-    for (var i = 0; i < getNumberOfSections(); ++i) {
-      var sectioni = getSection(i);
-      var tooli = sectioni.getTool();
-      for (var j = i + 1; j < getNumberOfSections(); ++j) {
-        var sectionj = getSection(j);
-        var toolj = sectionj.getTool();
-        if (tooli.number == toolj.number) {
-          if (xyzFormat.areDifferent(tooli.diameter, toolj.diameter) ||
-              xyzFormat.areDifferent(tooli.cornerRadius, toolj.cornerRadius) ||
-              abcFormat.areDifferent(tooli.taperAngle, toolj.taperAngle) ||
-              (tooli.numberOfFlutes != toolj.numberOfFlutes)) {
-            error(
-              subst(
-                localize("Using the same tool number for different cutter geometry for operation '%1' and '%2'."),
-                sectioni.hasParameter("operation-comment") ? sectioni.getParameter("operation-comment") : ("#" + (i + 1)),
-                sectionj.hasParameter("operation-comment") ? sectionj.getParameter("operation-comment") : ("#" + (j + 1))
-              )
-            );
-            return;
-          }
-        }
-      }
-    }
-  }
 
   if ((getNumberOfSections() > 0) && (getSection(0).workOffset == 0)) {
     for (var i = 0; i < getNumberOfSections(); ++i) {
@@ -434,7 +408,7 @@ function getWorkPlaneMachineABC(workPlane) {
     );
   }
 
-  var tcp = true;
+  var tcp = false;
   if (tcp) {
     setRotation(W); // TCP mode
   } else {
@@ -491,13 +465,14 @@ function onSection() {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
 
-    if (tool.number > 33) {
+    if (tool.number > 32) {
       warning(localize("Tool number exceeds maximum value."));
     }
 
     if (properties.useM6) {
       writeBlock("T" + toolFormat.format(tool.number), mFormat.format(6))
-      writeBlock(gFormat.format(43) + " " + "H" + toolFormat.format(tool.number));    } else {
+      writeBlock(gFormat.format(43) + " " + "H" + toolFormat.format(tool.number));    
+    } else {
       writeBlock("T" + toolFormat.format(tool.number));
     }
     if (tool.comment) {
@@ -538,7 +513,7 @@ function onSection() {
       }
     }
   }
-  
+     // custom Spindle limiting code for my KRESS AMB SPINDLE
   if (insertToolCall ||
       isFirstSection() ||
       (rpmFormat.areDifferent(tool.spindleRPM, sOutput.getCurrent())) ||
@@ -627,7 +602,7 @@ function onSection() {
 
   if (insertToolCall || retracted) {
     var lengthOffset = tool.lengthOffset;
-    if (lengthOffset > 99) {
+    if (lengthOffset > 33) {
       error(localize("Length offset out of range."));
       return;
     }
@@ -705,7 +680,7 @@ function onLinear(_x, _y, _z, feed) {
     if (pendingRadiusCompensation >= 0) {
       pendingRadiusCompensation = -1;
       var d = tool.diameterOffset;
-      if (d > 99) {
+      if (d > 33) {
         warning(localize("The diameter offset exceeds the maximum value."));
       }
       writeBlock(gPlaneModal.format(17));

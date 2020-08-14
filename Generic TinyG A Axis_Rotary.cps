@@ -19,6 +19,7 @@ minimumRevision = 24000;
 
 extension = "gcode";
 setCodePage("ascii");
+
 tolerance = spatial(0.002, MM);
 capabilities = CAPABILITY_MILLING;
 
@@ -29,6 +30,8 @@ minimumCircularSweep = toRad(0.01);
 maximumCircularSweep = toRad(180);
 allowHelicalMoves = true;
 allowedCircularPlanes = undefined; // allow any circular motion
+
+
 
 // user-defined properties
 properties = {
@@ -47,6 +50,7 @@ properties = {
   usePostProcessorSpindleSpeedOverride: true, // Enables Min Max Spindle Overwriting by Fusion 360 Post Processor
   EnableAAxis:true, // Enable A Axis
 };
+
 
 
 var permittedCommentChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,=_-";
@@ -131,6 +135,10 @@ function onOpen() {
   }
 
 }
+ if (properties.EnableBAxis) {
+  var bAxis = createAxis({coordinate:0, table:true, axis:[0, -1, 0], cyclic:true, preference:1});
+  machineConfiguration = new MachineConfiguration(bAxis);
+
  }
   if (!machineConfiguration.isMachineCoordinate(0)) {
     aOutput.disable();
