@@ -9,7 +9,7 @@
   
   FORKID {19EA9069-B05C-460b-A06C-C5264A4FF852}
 */
-
+ 
 description = "g2core A Axis Rotary";
 vendor = "Synthetos";
 vendorUrl = "https://www.synthetos.com";
